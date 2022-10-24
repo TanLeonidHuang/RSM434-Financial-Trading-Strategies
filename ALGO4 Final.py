@@ -5,7 +5,7 @@ import numpy as np
 from time import sleep
 
 s = requests.Session()
-s.headers.update({'X-API-key': '3OV7LJ7A'}) # Dektop
+s.headers.update({'X-API-key': 'BZ5DLXR5'}) # Dektop
 
 MAX_LONG_EXPOSURE_NET = 25000
 MAX_SHORT_EXPOSURE_NET = -25000

@@ -3,12 +3,12 @@ import numpy as np
 from time import sleep
 
 s = requests.Session()
-s.headers.update({'X-API-key': '3OV7LJ7A'}) # Dektop
+s.headers.update({'X-API-key': 'BZ5DLXR5'}) # Dektop
 
 MAX_LONG_EXPOSURE_NET = 25000
 MAX_SHORT_EXPOSURE_NET = -25000
 MAX_EXPOSURE_GROSS = 500000
-ORDER_LIMIT = 1000
+ORDER_LIMIT = 10000
 past_tick = 0
 ticker_list = ['RGLD','RFIN','INDX']
 
@@ -57,7 +57,12 @@ def get_position_tick():
         position = book[1]['position']
         return int(position)
         
-
+def get_position_INDX():
+    resp = s.get('http://localhost:9999/v1/securities')
+    if resp.ok:
+        book = resp.json()
+        position = book[3]['position']
+        return int(position)
 def get_open_orders(ticker):
     payload = {'ticker': ticker}
     resp = s.get ('http://localhost:9999/v1/orders', params = payload)
@@ -119,6 +124,8 @@ def main():
     n = 0
     print('atthebeginning')
     s.post('http://localhost:9999/v1/leases', params = {'ticker': 'ETF-Creation'})
+    s.post('http://localhost:9999/v1/leases', params = {'ticker': 'ETF-Redemption'})
+
     past_tick = 0
     while status == 'ACTIVE':
         while is_within():
@@ -130,36 +137,36 @@ def main():
                 sI = askI-bidI
                 gross_position, net_position = get_position()   
                 if gross_position < 300000:
-                    if (askI + 0.0675) < (bidG + bidF):
-                        pass
-                        #s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RGLD', 'type': 'MARKET', 'quantity': ORDER_LIMIT, 'price': (askG- sG/3), 'action': 'SELL'})
-                        #s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RFIN', 'type': 'MARKET', 'quantity': ORDER_LIMIT, 'price': (askF- sF/3), 'action': 'SELL'})
-                        #s.post('http://localhost:9999/v1/orders', params = {'ticker': 'INDX', 'type': 'MARKET', 'quantity': ORDER_LIMIT, 'price': (bidI + sG/2), 'action': 'BUY'})
-                        #s.post('http://localhost:9999/v1/leases', params = {'ticker': 'ETF-Redemption'})
-                        #resp = s.get('http://localhost:9999/v1/leases')
-                        #lease_number = resp.json()[0]['id']
-                        #print(lease_number)
-                        #print(s.post('http://localhost:9999/v1/leases' + '/' + str(lease_number), params = {'from1': 'INDX', 'quantity1': 1000, 'from2': 'CAD', 'quantity2': 38}))
-                    
-                    elif (askG + askF + 0.02) < (bidI):
+                    if (askI + 0.0575) < (bidG + bidF):
+                        s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RGLD', 'type': 'MARKET', 'quantity': ORDER_LIMIT, 'price': (askG- sG/3), 'action': 'SELL'})
+                        s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RFIN', 'type': 'MARKET', 'quantity': ORDER_LIMIT, 'price': (askF- sF/3), 'action': 'SELL'})
+                        s.post('http://localhost:9999/v1/orders', params = {'ticker': 'INDX', 'type': 'MARKET', 'quantity': ORDER_LIMIT, 'price': (bidI + sG/2), 'action': 'BUY'})
+
+                    elif (askG + askF + 0.01) < (bidI):
                         print('here')
                         s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RGLD', 'type': 'MARKET', 'quantity': ORDER_LIMIT, 'action': 'BUY'})
                         s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RFIN', 'type': 'MARKET', 'quantity': ORDER_LIMIT, 'action': 'BUY'})
                         s.post('http://localhost:9999/v1/orders', params = {'ticker': 'INDX', 'type': 'MARKET', 'quantity': ORDER_LIMIT, 'action': 'SELL'})
+                        resp = s.get('http://localhost:9999/v1/leases')
+                        lease_number = resp.json()[0]['id']
+                        s.post('http://localhost:9999/v1/leases' + '/' + str(lease_number), params = {'from1': 'RGLD', 'quantity1': get_position_tick(), 'from2': 'RFIN', 'quantity2': get_position_tick()})
                     #else:
                         #s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RGLD', 'type': 'LIMIT', 'quantity': 200, 'price': (bidG + sG/2), 'action': 'BUY'})
                         #s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RFIN', 'type': 'LIMIT', 'quantity': 200, 'price': (bidF + sF/2), 'action': 'BUY'})
                         #s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RGLD', 'type': 'LIMIT', 'quantity': 200, 'price': (askG - sG/2), 'action': 'SELL'})
                         #s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RFIN', 'type': 'LIMIT', 'quantity': 200, 'price': (askF - sF/2), 'action': 'SELL'})
-                    if (tick - past_tick) >= 2:
-                        past_tick = tick
-                        if (askG + askF + 0.01) < (bidI):
-                            print('here1')
-                            print(get_position_tick())
-                            x = get_position_tick()
-                            resp = s.get('http://localhost:9999/v1/leases')
-                            lease_number = resp.json()[0]['id']
-                            s.post('http://localhost:9999/v1/leases' + '/' + str(lease_number), params = {'from1': 'RGLD', 'quantity1': x, 'from2': 'RFIN', 'quantity2': x})
+                if (tick - past_tick) >= 2:
+                    resp = s.get('http://localhost:9999/v1/leases')
+                    past_tick = tick
+                    if (askG + askF) < (bidI):
+                        x = get_position_tick()                           
+                        lease_number = resp.json()[0]['id']
+                        s.post('http://localhost:9999/v1/leases' + '/' + str(lease_number), params = {'from1': 'RGLD', 'quantity1': x, 'from2': 'RFIN', 'quantity2': x})
+                    elif (askI + 0.0375) < (bidG + bidF):
+                        x = get_position_INDX()
+                        lease_number = resp.json()[1]['id']
+                        s.post('http://localhost:9999/v1/leases' + '/' + str(lease_number), params = {'from1': 'INDX', 'quantity1': x, 'from2': 'CAD', 'quantity2': int(x*0.0375)})
+
 
                 sleep(0.4)
                 tick, status = get_tick()

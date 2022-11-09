@@ -3,7 +3,7 @@ import numpy as np
 from time import sleep
 
 s = requests.Session()
-s.headers.update({'X-API-key': 'BZ5DLXR5'}) # Dektop
+s.headers.update({'X-API-key': '3OV7LJ7A'}) # Dektop
 
 MAX_LONG_EXPOSURE = 25000
 MAX_SHORT_EXPOSURE = -25000
@@ -44,7 +44,7 @@ def get_position():
         book = resp.json()
         return (book[0]['position']) + (book[1]['position']) + (book[2]['position'])
     
-def get_position_ticker(ticker):
+def get_position_ticker(ticker, ticker_dict):
     resp = s.get('http://localhost:9999/v1/securities')
     if ticker == 'CNR':
         pos = 0
@@ -81,58 +81,42 @@ def set_prices(ticker_list):
         market_prices[i,0], market_prices[i,1] = get_bid_ask(ticker_symbol)                
     return market_prices
 
+def trade(direction, order_size, ticker, price):
+    s.post('http://localhost:9999/v1/orders', params = {'ticker': ticker, 'type': 'LIMIT', 'quantity': order_size, 'price': price, 'action': direction})
+
+
 def main():
     tick, status = get_tick()
     ticker_list = ['CNR', 'RY', 'AC']
+    ticker_dict = {'CNR': 0, 'RY': 1, 'AC': 2}
     total_list = []
     n = 0
     total = 0
     total2 = 0
     while status == 'ACTIVE':
-        for _ in range(0,3):
+        for _ in range(0,1):
             market_prices = set_prices(ticker_list)
-            bidC, askC, bidR, askR, bidA, askA = market_prices[n, 0], market_prices[n, 1], market_prices[n+1, 0], market_prices[n+1, 1], market_prices[n+2, 0], market_prices[n+2, 1]
+            bidC, askC, bidR, askR, bidA, askA = market_prices[0, 0], market_prices[0, 1], market_prices[1, 0], market_prices[1, 1], market_prices[2, 0], market_prices[2, 1]
             sC, sR, sA = askC-bidC, askR-bidR, askA-bidA
             price_list = [[bidC, askC, sC], [bidR, askR, sR], [bidA, askA, sA]]
             sC_average = []
             sC_average.append(sC)
-            
-            position = get_position_ticker()
-            if position <= 15000:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'CNR', 'type': 'LIMIT', 'quantity': 2000, 'price':bidC, 'action': 'BUY'})
-            else:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'CNR', 'type': 'LIMIT', 'quantity': 2000, 'price': askC - 0.01, 'action': 'SELL'})
-            position = get_position()
-            if position >= -15000:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'CNR', 'type': 'LIMIT', 'quantity': 2000, 'price': askC, 'action': 'SELL'})
-            else:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'CNR', 'type': 'LIMIT', 'quantity': 2000, 'price': bidC + 0.01, 'action': 'BUY'})
-                
-                
-            if position <= 15000:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RY', 'type': 'LIMIT', 'quantity': 2000, 'price':bidR, 'action': 'BUY'})
-            else:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RY', 'type': 'LIMIT', 'quantity': 2000, 'price': askR - 0.01, 'action': 'SELL'})
-            position = get_position()
-            if position >= -15000:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RY', 'type': 'LIMIT', 'quantity': 2000, 'price': askR, 'action': 'SELL'})
-            else:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RY', 'type': 'LIMIT', 'quantity': 2000, 'price': bidR + 0.01, 'action': 'BUY'})
-                
-                
-            if position <= 15000:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'AC', 'type': 'LIMIT', 'quantity': 2000, 'price':bidA, 'action': 'BUY'})
-            else:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'AC', 'type': 'LIMIT', 'quantity': 2000, 'price': askA - 0.01, 'action': 'SELL'})
-            position = get_position()
-            if position >= -15000:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'AC', 'type': 'LIMIT', 'quantity': 2000, 'price': askA, 'action': 'SELL'})
-            else:
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'AC', 'type': 'LIMIT', 'quantity': 2000, 'price': bidA + 0.01, 'action': 'BUY'})
-        
-
-            sleep(0.3)       
-        s.post('http://localhost:9999/v1/commands/cancel', params = {'ticker': 'CNR'})
+            for n in range(0, len(ticker_list)):
+                ticker = ticker_list[n]
+                price = price_list[n]
+                position = get_position_ticker(ticker_list[n], ticker_dict)
+                if position <= 4000:
+                    trade('BUY', 2000, ticker, price[0])
+                else:
+                    trade('SELL', 2000, ticker, price[1]-(price[2]/3))
+                position = get_position_ticker(ticker_list[n], ticker_dict)
+                if position >= -4000:
+                    trade('SELL', 2000, ticker, price[1])
+                else:
+                    trade('BUY', 2000, ticker, price[0]+(price[2]/3))
+            sleep(0.4)
+        for ticker in ticker_list:
+            s.post('http://localhost:9999/v1/commands/cancel', params = {'ticker': ticker})
         tick, status = get_tick()
         for i in sC_average:
             total += i

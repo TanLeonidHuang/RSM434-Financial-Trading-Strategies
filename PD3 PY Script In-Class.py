@@ -3,13 +3,13 @@ from time import sleep
 import numpy as np
 
 s = requests.Session()
-s.headers.update({'X-API-key': 'BZ5DLXR5'}) # Make sure you use YOUR API Key
+s.headers.update({'X-API-key': '3OV7LJ7A'}) # Make sure you use YOUR API Key
 
 # global variables
 MAX_LONG_EXPOSURE_NET = 25000
 MAX_SHORT_EXPOSURE_NET = -25000
 MAX_EXPOSURE_GROSS = 100000
-ORDER_LIMIT = 500
+ORDER_LIMIT = 500   
 
 def get_tick():   
     resp = s.get('http://localhost:9999/v1/case')
@@ -46,8 +46,10 @@ def get_position():
     if resp.ok:
         book = resp.json()
         gross_position = abs(book[0]['position']) + abs(book[1]['position']) + abs(book[2]['position'])
+        UB_position = book[0]['position']
+        GEM_position = book[1]['position']
         net_position = book[0]['position'] + book[1]['position'] + 2 * book[2]['position']
-        return gross_position, net_position
+        return gross_position, net_position, UB_position, GEM_position
 
 def get_open_orders(ticker):
     payload = {'ticker': ticker}
@@ -74,7 +76,6 @@ def set_prices(ticker_list):
 
 def get_news(estimates_data,news_query_length): 
     resp = s.get ('http://localhost:9999/v1/news')
-    x = np.random(low = -1.0, high = 1.0, )
     if resp.ok:
         news_query = resp.json()
         news_query_length_check = len(news_query)
@@ -89,15 +90,15 @@ def get_news(estimates_data,news_query_length):
             if news_query[0]['headline'].find("UB") > 0:
                 estimates_data[0,0] = max(newest_estimate - ((300 - newest_tick) / 50), estimates_data[0,0])
                 estimates_data[0,1] = min(newest_estimate + ((300 - newest_tick) / 50), estimates_data[0,1])
+                estimates_data[0,0], estimates_data[0,1] = con_int(estimates_data[0,0], estimates_data[0,1],newest_estimate, 0.95)
            
             elif news_query[0]['headline'].find("GEM") > 0:
                 estimates_data[1,0] = max(newest_estimate - ((300 - newest_tick) / 50), estimates_data[1,0])
                 estimates_data[1,1] = min(newest_estimate + ((300 - newest_tick) / 50), estimates_data[1,1])
-            
-        estimates_data[2,0] = estimates_data[0,0] + estimates_data[1,0]
-        estimates_data[2,1] = estimates_data[0,1] + estimates_data[1,1]
-                
-        return estimates_data, news_query_length, newest_estimate
+                estimates_data[1,0], estimates_data[1,1] = con_int(estimates_data[1,0], estimates_data[1,1],newest_estimate, 0.95)
+
+            return estimates_data, news_query_length       
+        
 
 def trade(price, ticker, direction, quantity):
     s.post('http://localhost:9999/v1/orders', params = {'ticker': ticker, 'type': 'LIMIT', 'quantity': quantity, 'price': price, 'action': direction})
@@ -128,42 +129,37 @@ def main():
             ticker_symbol = ticker_list[i]
             market_prices[i,0], market_prices[i,1] = get_bid_ask(ticker_symbol)
         
-        estimates_data, news_query_length, newest_estimate = get_news(estimates_data, news_query_length)
-        gross_position, net_position = get_position()
-        
-        print(estimates_data)
-        
+        if get_news(estimates_data, news_query_length) != None:
+            estimates_data, news_query_length = get_news(estimates_data, news_query_length)
+        gross_position, net_position, UB_position, GEM_position = get_position()
         
         if gross_position < MAX_EXPOSURE_GROSS:
             
             market_prices = set_prices(ticker_list)
-            maxU, minU, maxG, minG = estimates_data[0,0], estimates_data[0,1], estimates_data[1,0], estimates_data[1,1]
-            conUUB, conLUB = con_int(maxU, minU, estimates)
-            bidU, askU, bidG, askG, bidE, askE = market_prices[n, 0], market_prices[n, 1], market_prices[n+1, 0], market_prices[n+1, 1], market_prices[n+2, 0], market_prices[n+2, 1]
+            minU, maxU, minG, maxG = estimates_data[0,0], estimates_data[0,1], estimates_data[1,0], estimates_data[1,1]
+            bidU, askU, bidG, askG= market_prices[n, 0], market_prices[n, 1], market_prices[n+1, 0], market_prices[n+1, 1]
             sU = askU-bidU
             sG = askG-bidG
-            if (bidU + sU/3) > estimates_data[0,1]: 
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'UB', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': market_prices[0, 0], 'action': 'SELL'})
-                ub_length = news_query_length + tick
-                if tick - ub_length >= 0:
-                    s.post('http://localhost:9999/v1/orders', params = {'ticker': 'UB', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': market_prices[0, 1], 'action': 'BUY'})                    
-                                
-            elif estimates_data[0, 0] < (askU - sU/2): 
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'UB', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': market_prices[0, 1], 'action': 'BUY'}) 
-                ub_length_2 = news_query_length + tick
-                if tick - ub_length_2 >= 0:
-                    s.post('http://localhost:9999/v1/orders', params = {'ticker': 'UB', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': market_prices[0, 0], 'action': 'SELL'})                
-                
-            if (bidG + sG/3) > estimates_data[1, 1]: 
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': market_prices[1, 0], 'action': 'SELL'})
-                gem_length = news_query_length + tick
-                if tick - gem_length >= 0:
-                    s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': market_prices[1, 1], 'action': 'BUY'})    
-            elif estimates_data[1, 0] < (askG + sG/2): 
-                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': market_prices[1, 1], 'action': 'BUY'})                               
-                gem_length_2 = news_query_length + tick 
-                if tick - gem_length_2 >= 0:
-                    s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': market_prices[1, 0], 'action': 'SELL'})    
+            print([minU, askU], [maxU, bidU], [minG, askG], [maxG, bidG])
+            if (bidU + sU/3 + 0.02) > maxU: 
+                trade(bidU + sU/3 + 0.02, 'UB', 'SELL', ORDER_LIMIT)
+                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'UB', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': bidU + sU/3, 'action': 'SELL'})                                  
+            elif minU > (askU - sU/2 - 0.02):
+                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'UB', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': askU - sU/2, 'action': 'BUY'})
+            elif UB_position > 0:
+                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'UB', 'type': 'LIMIT', 'quantity': min(5000, UB_position), 'price': bidU + sU/3, 'action': 'SELL'})
+            elif UB_position < 0:
+                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'UB', 'type': 'LIMIT', 'quantity': min(5000, abs(UB_position)), 'price': askU - sU/2, 'action': 'BUY'})
+            if (bidG + sG/3 + 0.02) > maxG: 
+                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': bidG + sG/3, 'action': 'SELL'})
+            elif minG > (askG - sG/2 - 0.02): 
+                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': askG - sG/2, 'action': 'BUY'}) 
+            elif GEM_position > 0:
+                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': min(5000, GEM_position), 'price': bidG + sG/3, 'action': 'SELL'})
+            elif GEM_position > 0:
+                s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': min(5000, abs(GEM_position)), 'price': askG - sG/2, 'action': 'BUY'}) 
+
+
         sleep(0.5)
         for i in range(3):
             

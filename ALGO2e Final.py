@@ -3,10 +3,12 @@ import numpy as np
 from time import sleep
 
 s = requests.Session()
-s.headers.update({'X-API-key': '3OV7LJ7A'}) # Dektop
+s.headers.update({'X-API-key': 'BZ5DLXR5'}) # Dektop
 
 MAX_LONG_EXPOSURE = 25000
 MAX_SHORT_EXPOSURE = -25000
+b = 'BUY'
+sell = 'SELL'
 
 def get_tick():
     resp = s.get('http://localhost:9999/v1/case')
@@ -87,14 +89,14 @@ def trade(direction, order_size, ticker, price):
 
 def main():
     tick, status = get_tick()
-    ticker_list = ['CNR', 'RY', 'AC']
-    ticker_dict = {'CNR': 0, 'RY': 1, 'AC': 2}
+    ticker_list = ['RY']
+    ticker_dict = {'RY': 1}
     total_list = []
     n = 0
     total = 0
     total2 = 0
     while status == 'ACTIVE':
-        for _ in range(0,1):
+        for _ in range(0,3):
             market_prices = set_prices(ticker_list)
             bidC, askC, bidR, askR, bidA, askA = market_prices[0, 0], market_prices[0, 1], market_prices[1, 0], market_prices[1, 1], market_prices[2, 0], market_prices[2, 1]
             sC, sR, sA = askC-bidC, askR-bidR, askA-bidA
@@ -106,15 +108,15 @@ def main():
                 price = price_list[n]
                 position = get_position_ticker(ticker_list[n], ticker_dict)
                 if position <= 4000:
-                    trade('BUY', 2000, ticker, price[0])
+                    trade(b, 2000, ticker, price[0])
                 else:
-                    trade('SELL', 2000, ticker, price[1]-(price[2]/3))
+                    trade(sell, 2000, ticker, price[1]-(price[2]/2))
                 position = get_position_ticker(ticker_list[n], ticker_dict)
                 if position >= -4000:
-                    trade('SELL', 2000, ticker, price[1])
+                    trade(sell, 2000, ticker, price[1])
                 else:
-                    trade('BUY', 2000, ticker, price[0]+(price[2]/3))
-            sleep(0.4)
+                    trade(b, 2000, ticker, price[0]+(price[2]/2))
+            sleep(0.45)
         for ticker in ticker_list:
             s.post('http://localhost:9999/v1/commands/cancel', params = {'ticker': ticker})
         tick, status = get_tick()

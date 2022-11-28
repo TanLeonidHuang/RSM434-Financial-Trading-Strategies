@@ -74,6 +74,7 @@ def set_prices(ticker_list):
 
 def get_news(estimates_data,news_query_length): 
     resp = s.get ('http://localhost:9999/v1/news')
+    x = np.random(low = -1.0, high = 1.0, )
     if resp.ok:
         news_query = resp.json()
         news_query_length_check = len(news_query)
@@ -96,8 +97,20 @@ def get_news(estimates_data,news_query_length):
         estimates_data[2,0] = estimates_data[0,0] + estimates_data[1,0]
         estimates_data[2,1] = estimates_data[0,1] + estimates_data[1,1]
                 
-        return estimates_data, news_query_length 
+        return estimates_data, news_query_length, newest_estimate
 
+def trade(price, ticker, direction, quantity):
+    s.post('http://localhost:9999/v1/orders', params = {'ticker': ticker, 'type': 'LIMIT', 'quantity': quantity, 'price': price, 'action': direction})
+
+def con_int(upper, lower, estimate, conf):
+    upper_diff = upper - estimate
+    lower_diff = estimate - lower
+    
+    u = upper_diff * conf
+    l = lower_diff * conf
+    
+    return (u+estimate), (l+estimate)
+    
 def main():
     tick, status = get_tick()
     ticker_list = ['UB','GEM','ETF']
@@ -115,7 +128,7 @@ def main():
             ticker_symbol = ticker_list[i]
             market_prices[i,0], market_prices[i,1] = get_bid_ask(ticker_symbol)
         
-        estimates_data, news_query_length = get_news(estimates_data, news_query_length)
+        estimates_data, news_query_length, newest_estimate = get_news(estimates_data, news_query_length)
         gross_position, net_position = get_position()
         
         print(estimates_data)
@@ -124,6 +137,8 @@ def main():
         if gross_position < MAX_EXPOSURE_GROSS:
             
             market_prices = set_prices(ticker_list)
+            maxU, minU, maxG, minG = estimates_data[0,0], estimates_data[0,1], estimates_data[1,0], estimates_data[1,1]
+            conUUB, conLUB = con_int(maxU, minU, estimates)
             bidU, askU, bidG, askG, bidE, askE = market_prices[n, 0], market_prices[n, 1], market_prices[n+1, 0], market_prices[n+1, 1], market_prices[n+2, 0], market_prices[n+2, 1]
             sU = askU-bidU
             sG = askG-bidG
@@ -149,7 +164,6 @@ def main():
                 gem_length_2 = news_query_length + tick 
                 if tick - gem_length_2 >= 0:
                     s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': market_prices[1, 0], 'action': 'SELL'})    
-            
         sleep(0.5)
         for i in range(3):
             

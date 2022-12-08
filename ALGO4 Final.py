@@ -149,25 +149,25 @@ def main():
                     #s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RFIN', 'type': 'LIMIT', 'quantity': 200, 'price': (bidF + sF/2), 'action': 'BUY'})
                     #s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RGLD', 'type': 'LIMIT', 'quantity': 200, 'price': (askG - sG/2), 'action': 'SELL'})
                     #s.post('http://localhost:9999/v1/orders', params = {'ticker': 'RFIN', 'type': 'LIMIT', 'quantity': 200, 'price': (askF - sF/2), 'action': 'SELL'})
-            if (tick - past_tick >= 2):
-                past_tick = tick
-                passed = True
-            if passed:
-                passed = False
-                resp = s.get('http://localhost:9999/v1/leases')
-                if gross_position < 400000 and net_position < 15000:
+                if (tick - past_tick >= 2):
+                    past_tick = tick
+                    passed = True
+                if passed:
+                    passed = False
+                    resp = s.get('http://localhost:9999/v1/leases')
                     if (askG + askF + 0.015) < (bidI):
-                        x = check_position_diff([abs(get_position_tick(1)), abs(get_position_tick(2)), abs(get_position_tick(3)), 100000])  
-                        print(x)                    
-                        lease_number = resp.json()[0]['id']
-                        s.post('http://localhost:9999/v1/leases' + '/' + str(lease_number), params = {'from1': 'RGLD', 'quantity1': x, 'from2': 'RFIN', 'quantity2': x})
+                        if get_position_tick(1) == abs(get_position_tick(1)):
+                            x = check_position_diff([abs(get_position_tick(1)), abs(get_position_tick(2)), abs(get_position_tick(3)), 100000])  
+                            print(x)                    
+                            lease_number = resp.json()[0]['id']
+                            s.post('http://localhost:9999/v1/leases' + '/' + str(lease_number), params = {'from1': 'RGLD', 'quantity1': x, 'from2': 'RFIN', 'quantity2': x})
                     elif (askI + 0.0375) < (bidG + bidF):
-                        x = check_position_diff([abs(get_position_tick(1)), abs(get_position_tick(2)), abs(get_position_tick(3)), 100000])  
-                        print(-x)
-                        lease_number = resp.json()[1]['id']
-                        s.post('http://localhost:9999/v1/leases' + '/' + str(lease_number), params = {'from1': 'INDX', 'quantity1': x, 'from2': 'CAD', 'quantity2': int(x*0.0375)})
-
-
+                        if get_position_tick(1) != abs(get_position_tick(1)):                        
+                            x = check_position_diff([abs(get_position_tick(1)), abs(get_position_tick(2)), abs(get_position_tick(3)), 100000])  
+                            print(-x)
+                            lease_number = resp.json()[1]['id']
+                            s.post('http://localhost:9999/v1/leases' + '/' + str(lease_number), params = {'from1': 'INDX', 'quantity1': x, 'from2': 'CAD', 'quantity2': int(x*0.0375)})
+                            
             sleep(0.3)
             tick, status = get_tick()
 

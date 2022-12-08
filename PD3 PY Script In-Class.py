@@ -3,13 +3,13 @@ from time import sleep
 import numpy as np
 
 s = requests.Session()
-s.headers.update({'X-API-key': '3OV7LJ7A'}) # Make sure you use YOUR API Key
+s.headers.update({'X-API-key': 'BZ5DLXR5'}) # Make sure you use YOUR API Key
 
 # global variables
 MAX_LONG_EXPOSURE_NET = 25000
 MAX_SHORT_EXPOSURE_NET = -25000
 MAX_EXPOSURE_GROSS = 100000
-ORDER_LIMIT = 500   
+ORDER_LIMIT = 2000   
 
 def get_tick():   
     resp = s.get('http://localhost:9999/v1/case')
@@ -90,12 +90,12 @@ def get_news(estimates_data,news_query_length):
             if news_query[0]['headline'].find("UB") > 0:
                 estimates_data[0,0] = max(newest_estimate - ((300 - newest_tick) / 50), estimates_data[0,0])
                 estimates_data[0,1] = min(newest_estimate + ((300 - newest_tick) / 50), estimates_data[0,1])
-                estimates_data[0,0], estimates_data[0,1] = con_int(estimates_data[0,0], estimates_data[0,1],newest_estimate, 0.95)
+                estimates_data[0,0], estimates_data[0,1] = con_int(estimates_data[0,0], estimates_data[0,1],newest_estimate, 0.85)
            
             elif news_query[0]['headline'].find("GEM") > 0:
                 estimates_data[1,0] = max(newest_estimate - ((300 - newest_tick) / 50), estimates_data[1,0])
                 estimates_data[1,1] = min(newest_estimate + ((300 - newest_tick) / 50), estimates_data[1,1])
-                estimates_data[1,0], estimates_data[1,1] = con_int(estimates_data[1,0], estimates_data[1,1],newest_estimate, 0.95)
+                estimates_data[1,0], estimates_data[1,1] = con_int(estimates_data[1,0], estimates_data[1,1],newest_estimate, 0.85)
 
             return estimates_data, news_query_length       
         
@@ -156,7 +156,7 @@ def main():
                 s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': ORDER_LIMIT, 'price': askG - sG/2, 'action': 'BUY'}) 
             elif GEM_position > 0:
                 s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': min(5000, GEM_position), 'price': bidG + sG/3, 'action': 'SELL'})
-            elif GEM_position > 0:
+            elif GEM_position < 0:
                 s.post('http://localhost:9999/v1/orders', params = {'ticker': 'GEM', 'type': 'LIMIT', 'quantity': min(5000, abs(GEM_position)), 'price': askG - sG/2, 'action': 'BUY'}) 
 
 
